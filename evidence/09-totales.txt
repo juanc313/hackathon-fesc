@@ -1,0 +1,24 @@
+INCIDENTE 9 — Totales que no cuadran con la hoja de control
+==========================================================
+
+$ cat output/totales.txt
+total_afiliados=1500
+activos=1194
+inactivos=274
+excepciones=104
+
+$ cat control/hoja_control.csv
+clave,valor
+fecha_corte,2026-09-30
+total_afiliados,1500
+activos,1194
+inactivos,274
+
+$ for k in total_afiliados activos inactivos; do
+    echo -n "$k -> cierre=$(grep "^$k=" output/totales.txt | cut -d= -f2) ";
+    echo "control=$(awk -F, -v k=$k '$1==k{print $2}' control/hoja_control.csv)"; done
+total_afiliados -> cierre=1500 control=1500
+activos -> cierre=1194 control=1194
+inactivos -> cierre=274 control=274
+
+Las tres claves del contrato coinciden con la hoja de control.

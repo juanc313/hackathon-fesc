@@ -1,0 +1,24 @@
+INCIDENTE 8 — Extracto de Caja Oriente con otras columnas
+==========================================================
+
+$ head -2 data/extracto_caja_oriente.csv
+id_afiliado;nombres_apellidos;situacion;fecha_reporte
+000013022985;DANIELA LOPEZ OCHOA;VIGENTE;30/09/2026
+
+$ head -1 output/afiliados_activos.csv
+documento,nombre,estado,cod_empresa,empresa,beneficiarios,ultimo_aporte
+(el archivo de activos conserva el formato del contrato)
+
+$ grep CRUCE_NO_COINCIDE output/excepciones.csv | head -5
+1000385358,CRUCE_NO_COINCIDE,no existe en AFI_MAE (extracto dice VIGENTE)
+1002471016,CRUCE_NO_COINCIDE,no existe en AFI_MAE (extracto dice VIGENTE)
+1008958781,CRUCE_NO_COINCIDE,situacion RETIRADO no coincide con el estado A
+1013042442,CRUCE_NO_COINCIDE,no existe en AFI_MAE (extracto dice VIGENTE)
+1021958956,CRUCE_NO_COINCIDE,situacion VIGENTE no coincide con el estado I
+
+$ grep -c CRUCE_NO_COINCIDE output/excepciones.csv
+25
+
+El extracto usa ';', documentos de 12 dígitos con ceros a la izquierda y
+fechas DD/MM/YYYY; se normaliza el documento y se compara la situación
+(VIGENTE/RETIRADO) con nuestro EST_AFI, reportando lo que no coincide.

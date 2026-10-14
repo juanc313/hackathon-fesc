@@ -1,0 +1,27 @@
+INCIDENTE 10 — El cierre solo funcionaba una vez
+==========================================================
+
+== Primera ejecución ==
+$ ./run.sh
+Cierre terminado
+  total_afiliados=1500 activos=1194 inactivos=274 excepciones=104
+  error más frecuente: CIE-4012 (1424 ocurrencias)
+
+== Segunda ejecución consecutiva ==
+$ ./run.sh
+Cierre terminado
+  total_afiliados=1500 activos=1194 inactivos=274 excepciones=104
+  error más frecuente: CIE-4012 (1424 ocurrencias)
+
+$ diff -r /tmp/cierre-primera output && echo 'SALIDAS IDENTICAS'
+SALIDAS IDENTICAS
+
+$ grep -c procesados scripts/cierre.sh ; ls data/ | wc -l
+0
+5
+
+El script ya no mueve AFI_MAE.csv a procesados/, así que la entrada queda
+intacta y el cierre es repetible.
+
+== Comandos a ejecutar con Docker (tras ./reset.sh) ==
+$ ./reset.sh && ./run.sh && ./run.sh   # tras reset.sh el cierre vuelve a dar los mismos totales
