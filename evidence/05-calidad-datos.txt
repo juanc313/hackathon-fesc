@@ -1,0 +1,29 @@
+INCIDENTE 5 — Duplicados, sin empresa, huérfanos y códigos inválidos
+==========================================================
+
+$ awk -F, 'NR>1 {print $7}' data/AFI_MAE.csv | sort | uniq -c | sort -rn
+   1225 A
+    281 I
+      5 Z
+      4 P
+      3 9
+      2 X
+
+$ awk -F, 'NR>1 {print $1}' data/AFI_MAE.csv | sort | uniq -d | wc -l
+20
+
+$ awk -F, 'NR>1 {print $2}' data/AFI_BEN.csv | sort -u > /tmp/afis.txt; awk -F, 'NR>1 {print $1}' data/AFI_MAE.csv | sort -u > /tmp/docs.txt; comm -23 /tmp/afis.txt /tmp/docs.txt | wc -l
+15
+
+== Excepciones reportadas por el cierre (output/excepciones.csv) ==
+$ awk -F, 'NR>1 {print $2}' output/excepciones.csv | sort | uniq -c
+     15 BENEFICIARIO_HUERFANO
+     14 CODIGO_INVALIDO
+     25 CRUCE_NO_COINCIDE
+     20 DUPLICADO
+     12 FECHA_INVALIDA
+     18 SIN_EMPRESA
+
+== Comandos a ejecutar con Docker (verificación en la base) ==
+$ docker compose exec cierre-db psql -U cierre -d cierre -c \
+    "SELECT count(*), count(DISTINCT nro_doc) FROM afi_mae"

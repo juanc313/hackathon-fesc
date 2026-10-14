@@ -1,0 +1,43 @@
+INCIDENTE 6 — La consulta del afiliado responde 500
+==========================================================
+
+== Código original del kit (extraído del ZIP) ==
+$ unzip -p ../fesc-tecnico.zip fesc-tecnico/services/api/app.py | sed -n '20,26p'
+ROUTE = re.compile(r"^/afiliados/([0-9]+)$")
+
+QUERY = """
+SELECT a.nro_doc, a.nom1, a.nom2, a.ape1, a.ape2, a.est_afi, e.nom_emp
+FROM afi_mae a
+JOIN empresa e ON e.cod_emp = a.cod_emp
+WHERE a.nro_doc = %s
+
+$ unzip -p ../fesc-tecnico.zip fesc-tecnico/services/api/app.py | sed -n '51,55p'
+        return None
+    nro_doc, nom1, nom2, ape1, ape2, est_afi, nom_emp = row
+    nombre = nom1 + " " + nom2 + " " + ape1 + " " + ape2
+    return {"documento": nro_doc, "nombre": nombre.strip(), "estado": ESTADOS[est_afi], "empresa": nom_emp}
+
+
+Los campos opcionales vacíos del CSV (por ejemplo el segundo nombre) se
+cargan como NULL: 'nom1 + " " + nom2' lanzaba TypeError y la API devolvía 500.
+Además JOINT con empresa descartaba afiliados sin empresa, y ESTADOS[est_afi]
+lanzaba KeyError con un código de estado inválido.
+
+== Corrección aplicada ==
+$ sed -n '22,31p' services/api/app.py
+# LEFT JOIN: un afiliado sin empresa en EMPRESA debe seguir respondiendo (con
+# empresa vacía) en vez de desaparecer y provocar un 404 falso. Los CSV del
+# origen traen campos opcionales vacíos, que \copy carga como NULL; por eso
+# también se usa COALESCE.
+QUERY = """
+SELECT a.nro_doc, a.nom1, a.nom2, a.ape1, a.ape2, a.est_afi, COALESCE(e.nom_emp, '')
+FROM afi_mae a
+LEFT JOIN empresa e ON e.cod_emp = a.cod_emp
+WHERE a.nro_doc = %s
+LIMIT 1
+
+== Comandos a ejecutar con Docker ==
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/afiliados/3756530718
+$ curl -s http://localhost:8081/afiliados/88121168
+$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/afiliados/0000000001
+Resultado esperado: 200 con los datos, y 404 para el documento inexistente.

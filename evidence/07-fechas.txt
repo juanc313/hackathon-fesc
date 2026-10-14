@@ -1,0 +1,32 @@
+INCIDENTE 7 — Fechas en formatos que el cierre no entiende
+==========================================================
+
+$ awk -F, 'NR>1 {print $9}' data/AFI_MAE.csv | sed -E 's/[0-9]/9/g' | sort | uniq -c
+      1 99-99-9999
+     11 99/99/9999
+   1493 9999-99-99
+      1 9999/99/99
+     11 99999999
+      1 N/A
+      2 SIN FECHA
+
+$ grep FECHA_INVALIDA output/excepciones.csv
+1044259063,FECHA_INVALIDA,fec_afi=2025-02-30
+1052051148,FECHA_INVALIDA,fec_afi=31/13/2024
+1058468350,FECHA_INVALIDA,fec_afi=SIN FECHA
+3709342692,FECHA_INVALIDA,fec_afi=2024-00-10
+3757045739,FECHA_INVALIDA,fec_afi=00000000
+60087263,FECHA_INVALIDA,fec_afi=15-15-2019
+6026309765,FECHA_INVALIDA,fec_afi=N/A
+60692566,FECHA_INVALIDA,fec_afi=SIN FECHA
+6089354914,FECHA_INVALIDA,fec_afi=31/13/2024
+8803649849,FECHA_INVALIDA,fec_afi=2023/02/29
+8830134354,FECHA_INVALIDA,fec_afi=2025-02-30
+8874391659,FECHA_INVALIDA,fec_afi=00000000
+
+$ grep -c FECHA_INVALIDA output/excepciones.csv
+12
+
+DD/MM/YYYY y YYYYMMDD se normalizan; las que no son fechas reales
+(31/13/2024, 00000000, N/A, SIN FECHA, 2023/02/29) se reportan y el
+registro NUNCA se descarta en silencio.
