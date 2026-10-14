@@ -1,0 +1,29 @@
+INCIDENTE 3 — El script de cierre no lee su archivo de entrada
+==========================================================
+
+== Script original del kit (extraído del ZIP) ==
+$ unzip -p ../fesc-tecnico.zip fesc-tecnico/scripts/cierre.sh | sed -n '8,12p'
+ENTRADA=/opt/cierre/entrada
+SALIDA=output
+
+mkdir $SALIDA
+
+
+$ unzip -p ../fesc-tecnico.zip fesc-tecnico/scripts/cierre.sh | sed -n '30,34p'
+
+# El archivo de entrada ya fue procesado
+mkdir -p $ENTRADA/procesados
+mv $ENTRADA/AFI_MAE.csv $ENTRADA/procesados/
+
+
+$ find . -maxdepth 2 -type d -name entrada
+(no existe /opt/cierre/entrada: los CSV están en data/)
+
+== Comandos ejecutados sobre el original (fallaban) ==
+$ ls /opt/cierre/entrada
+ls: cannot access '/opt/cierre/entrada': No such file or directory
+$ mkdir output   # segunda ejecución
+mkdir: no se puede crear el directorio 'output': ya existe
+
+Solución aplicada: el cierre lee data/, hace mkdir -p sobre output/ y ya no
+mueve AFI_MAE.csv a procesados/, así que puede ejecutarse varias veces.

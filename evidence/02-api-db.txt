@@ -1,0 +1,21 @@
+INCIDENTE 2 — La API no conecta a la base
+==========================================================
+
+== Diagnóstico ==
+$ unzip -p ../fesc-tecnico.zip fesc-tecnico/.env.example | grep -n DATABASE_HOST
+7:DATABASE_HOST=cierre-database
+
+$ grep -nE '^  cierre-db:|^  cierre-api:|^  cierre-worker:' docker-compose.yml
+4:  cierre-db:
+20:  cierre-api:
+29:  cierre-worker:
+
+El .env apuntaba a 'cierre-database', pero el servicio de la base se llama
+'cierre-db'. Dentro de la red de Compose los contenedores se resuelven por
+nombre de servicio, así que la API respondía 503 (CIE-2210).
+
+== Comandos a ejecutar con Docker ==
+$ docker compose ps
+$ docker compose logs cierre-api | tail -5
+
+Solución aplicada: .env.example -> DATABASE_HOST=cierre-db
