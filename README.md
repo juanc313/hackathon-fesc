@@ -24,11 +24,11 @@ docker compose ps
 ./run.sh
 ```
 
-`docker compose up -d --build` levanta la base de datos, la API y el worker, y `./run.sh` ejecuta el cierre y deja los cuatro archivos en `output/`. Si el entorno queda a medias, `./reset.sh` lo devuelve al estado inicial, recarga la base desde `data/` y borra la carpeta de salida.
+`docker compose up -d --build` levanta la base de datos, la API y el worker, y `./run.sh` ejecuta el cierre y deja los cuatro archivos en `output/`. Si el entorno queda a medias, `./reset.sh` lo devuelve al estado inicial, recarga la base desde `data/` y borra la carpeta de salida. El entorno levanta incluso sin `.env`: cada variable de `docker-compose.yml` se declara como `${VARIABLE:-predeterminado}`, así que `docker compose up -d --build` funciona desde una copia limpia y `.env` solo sirve para cambiar esos valores.
 
 ## Configuración
 
-Todas las variables se leen del archivo `.env` (se entrega `.env.example`; el `.env` real no se versiona porque está en `.gitignore`).
+Todas las variables se leen del archivo `.env` (se entrega `.env.example`; el `.env` real no se versiona porque está en `.gitignore`). Cada una se declara también en `docker-compose.yml` como `${VARIABLE:-predeterminado}`, de modo que si `.env` no existe el entorno igual levanta con esos valores predeterminados.
 
 | Variable | Para qué sirve | Valor de ejemplo |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ Levanta el entorno con `docker compose up -d --build` y ejecuta `./validator che
 
 ## Qué resolvimos
 
-Encontramos y corregimos los diez incidentes del kit. El worker salía con error porque `WORKER_INTERVAL_SECONDS` traía `30s`; la API no conectaba porque `DATABASE_HOST` apuntaba a un host que no existe; el cierre heredado leía una ruta inexistente, creaba su carpeta sin `-p` y movía su propia entrada; y la consulta de afiliados fallaba con 500 por los campos vacíos y un `JOIN` mal armado. Completamos el cierre para que normalice fechas, cruce el extracto de Caja Oriente y reporte duplicados, afiliados sin empresa, beneficiarios huérfanos y códigos inválidos. Al final los totales cuadran con la hoja de control y el cierre es repetible.
+Encontramos y corregimos los diez incidentes del kit. El worker salía con error porque `WORKER_INTERVAL_SECONDS` traía `30s`; la API no conectaba porque `DATABASE_HOST` apuntaba a un host que no existe; el cierre heredado leía una ruta inexistente, creaba su carpeta sin `-p` y movía su propia entrada; y la consulta de afiliados fallaba con 500 por los campos vacíos y un `JOIN` mal armado. Completamos el cierre para que normalice fechas, cruce el extracto de Caja Oriente y reporte duplicados, afiliados sin empresa, beneficiarios huérfanos y códigos inválidos. Al final los totales cuadran con la hoja de control, el cierre es repetible y el entorno queda levantable desde cero con `docker compose up -d --build` aunque no exista `.env`.
 
 ## Limitaciones y pendientes
 
