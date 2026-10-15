@@ -20,7 +20,7 @@ $ unzip -p ../fesc-tecnico.zip fesc-tecnico/services/api/app.py | sed -n '51,55p
 
 Los campos opcionales vacíos del CSV (por ejemplo el segundo nombre) se
 cargan como NULL: 'nom1 + " " + nom2' lanzaba TypeError y la API devolvía 500.
-Además JOINT con empresa descartaba afiliados sin empresa, y ESTADOS[est_afi]
+Además el JOIN con empresa descartaba afiliados sin empresa, y ESTADOS[est_afi]
 lanzaba KeyError con un código de estado inválido.
 
 == Corrección aplicada ==
@@ -44,40 +44,52 @@ $ grep -n "CIE-5003" logs/api.log | head -5
 23:2026-09-30 20:00:11,894 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=2649871217
 41:2026-09-30 20:00:21,762 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=4819902315
 
-== Respuestas HTTP de services/api/app.py verificadas contra .validator.json ==
-(Nota: ejecutado levantando services/api/app.py en localhost:8081 con los CSV de data/ cargados con campos vacíos como None, igual que \copy en db/init/02_load.sql)
-$ curl -i -s http://localhost:8081/afiliados/3756530718
-HTTP/1.0 200 OK
-Content-Type: application/json; charset=utf-8
-Content-Length: 118
+== Verificación de la respuesta contra las huellas del validador ==
+En este equipo no hay motor de Docker, así que la API no se pudo levantar contra
+PostgreSQL real y no se guarda aquí ninguna salida de `curl`. Lo que sí se puede
+comprobar es la lógica de la consulta: se reproduce sobre los mismos datos que
+carga la base (db/init/02_load.sql toma los CSV de data/ con \copy, que carga los
+campos vacíos como NULL) y el resultado se contrasta con las huellas de
+.validator.json, que es lo que evalúa la prueba T06 del validador.
 
-{"documento": "3756530718", "nombre": "CAROLINA CASTRO CASTELLANOS", "estado": "ACTIVO", "empresa": "CONSTRUCTORA SAN LUIS S EN C"}
+$ python3 - <<'PY'
+import csv, hashlib, json
+pub = json.load(open(".validator.json", encoding="utf-8"))
+def fp(v): return hashlib.pbkdf2_hmac("sha256", v.encode(), pub["salt"].encode(), 200000).hex()
+def filas(p):
+    with open(p, encoding="utf-8", newline="") as fh:
+        return [{k: (v if v != "" else None) for k, v in r.items()} for r in csv.DictReader(fh)]
+mae, emp = filas("data/AFI_MAE.csv"), filas("data/EMPRESA.csv")
+nom_emp = {r["COD_EMP"]: r["NOM_EMP"] for r in emp}
+ESTADOS = {"A": "ACTIVO", "I": "INACTIVO"}
+def respuesta(doc):
+    fila = [x for x in mae if x["NRO_DOC"] == doc]
+    if not fila:
+        return None
+    r = fila[0]
+    nombre = " ".join(p for p in (r["NOM1"], r["NOM2"], r["APE1"], r["APE2"]) if p)
+    estado = ESTADOS.get(r["EST_AFI"], r["EST_AFI"] or "DESCONOCIDO")
+    empresa = nom_emp.get(r["COD_EMP"], "") if r["COD_EMP"] else ""
+    return " ".join(nombre.split()), estado, empresa
 
-$ curl -i -s http://localhost:8081/afiliados/88121168
-HTTP/1.0 200 OK
-Content-Type: application/json; charset=utf-8
-Content-Length: 117
+for caso in pub["api_sample"]:
+    doc = caso["documento"]
+    nombre, estado, empresa = respuesta(doc)
+    llave = "|".join([" ".join(nombre.upper().split()), estado.upper(), empresa])
+    print("{0}  {1}  nombre={2!r} estado={3!r} empresa={4!r}".format(
+        doc, "huella COINCIDE con .validator.json" if fp(llave) == caso["hash"] else "huella NO COINCIDE",
+        nombre, estado, empresa))
+doc = pub["known_document"]
+print("{0}  (documento conocido del contrato)  {1}".format(doc, respuesta(doc)))
+doc = pub["missing_document"]
+print("{0}  {1}".format(doc, "sin filas en el maestro: la API responde 404" if respuesta(doc) is None else respuesta(doc)))
+PY
+3756530718  huella COINCIDE con .validator.json  nombre='CAROLINA CASTRO CASTELLANOS' estado='ACTIVO' empresa='CONSTRUCTORA SAN LUIS S EN C'
+88121168  huella COINCIDE con .validator.json  nombre='VALENTINA SANCHEZ SILVA' estado='INACTIVO' empresa='AGROPECUARIA LA ESPERANZA S EN C'
+6015866271  huella COINCIDE con .validator.json  nombre='HERNAN MOLINA RODRIGUEZ' estado='ACTIVO' empresa='CONFECCIONES SANTANDER LTDA'
+1098765432  (documento conocido del contrato)  ('JUAN CARLOS PEREZ GOMEZ', 'ACTIVO', 'EMPRESA ABC')
+0000000001  sin filas en el maestro: la API responde 404
 
-{"documento": "88121168", "nombre": "VALENTINA SANCHEZ SILVA", "estado": "INACTIVO", "empresa": "AGROPECUARIA LA ESPERANZA S EN C"}
-
-$ curl -i -s http://localhost:8081/afiliados/6015866271
-HTTP/1.0 200 OK
-Content-Type: application/json; charset=utf-8
-Content-Length: 113
-
-{"documento": "6015866271", "nombre": "HERNAN MOLINA RODRIGUEZ", "estado": "ACTIVO", "empresa": "CONFECCIONES SANTANDER LTDA"}
-
-$ curl -i -s http://localhost:8081/afiliados/1098765432
-HTTP/1.0 200 OK
-Content-Type: application/json; charset=utf-8
-Content-Length: 96
-
-{"documento": "1098765432", "nombre": "JUAN CARLOS PEREZ GOMEZ", "estado": "ACTIVO", "empresa": "EMPRESA ABC"}
-
-$ curl -i -s http://localhost:8081/afiliados/0000000001
-HTTP/1.0 404 Not Found
-Content-Type: application/json; charset=utf-8
-Content-Length: 36
-
-{"error": "afiliado no encontrado"}
-
+El código responde 200 cuando find_member() encuentra la fila y 404 cuando
+devuelve None (services/api/app.py, do_GET), que es el contrato del kit. Queda
+pendiente la ejecución contra PostgreSQL real, que corre en el servidor del evento.
