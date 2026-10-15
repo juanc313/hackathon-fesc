@@ -1,27 +1,37 @@
 INCIDENTE 1 — cierre-worker en Exited (1)
 ==========================================================
 
-== Diagnóstico sobre el repositorio (antes de la corrección) ==
+== Registros en el log de la última noche (logs/worker.log) ==
+$ grep -n "CIE-1107" logs/worker.log | head -5
+38:[2026-09-30T20:35:25Z] [ERROR] codigo=CIE-1107 detalle="Configuración inválida del intervalo de ejecución" lote=281
+48:[2026-09-30T20:35:30Z] [ERROR] codigo=CIE-1107 detalle="Configuración inválida del intervalo de ejecución" lote=300
+72:[2026-09-30T20:35:43Z] [ERROR] codigo=CIE-1107 detalle="Configuración inválida del intervalo de ejecución" lote=388
+94:[2026-09-30T20:35:53Z] [ERROR] codigo=CIE-1107 detalle="Configuración inválida del intervalo de ejecución" lote=218
+135:[2026-09-30T20:36:14Z] [ERROR] codigo=CIE-1107 detalle="Configuración inválida del intervalo de ejecución" lote=332
+
+== Diagnóstico en el código y la configuración original del kit ==
 $ unzip -p ../fesc-tecnico.zip fesc-tecnico/.env.example | grep -n WORKER_INTERVAL_SECONDS
 17:WORKER_INTERVAL_SECONDS=30s
 
-$ sed -n '23,30p' services/worker/worker.py
+$ sed -n '16,22p' services/worker/worker.py
+def load_interval():
+    raw = os.environ.get("WORKER_INTERVAL_SECONDS", "")
+    try:
+        return int(raw)
+    except ValueError:
+        log("ERROR", "codigo=CIE-1107 WORKER_INTERVAL_SECONDS debe ser un entero de segundos; valor recibido: '{0}'".format(raw))
+        sys.exit(1)
 
+== Reproducción del fallo y verificación de la corrección ==
+$ WORKER_INTERVAL_SECONDS=30s python3 -c "import sys; sys.path.insert(0,'services/worker'); import psycopg2_stub as psycopg2; sys.modules['psycopg2']=psycopg2; import worker; worker.load_interval()"
+[2026-10-14T23:35:10Z] [ERROR] codigo=CIE-1107 WORKER_INTERVAL_SECONDS debe ser un entero de segundos; valor recibido: '30s'
+(exit code 1)
 
-def reconcile():
-    conn = psycopg2.connect(
-        host=os.environ.get("DATABASE_HOST", "localhost"),
-        port=int(os.environ.get("DATABASE_PORT", "5432")),
-        dbname=os.environ.get("DATABASE_NAME", "cierre"),
-        user=os.environ.get("DATABASE_USER", "cierre"),
+$ grep -n WORKER_INTERVAL_SECONDS .env.example
+23:WORKER_INTERVAL_SECONDS=30
 
-El worker llama a load_interval(), que hace int(raw) y, si falla, registra
-CIE-1107 y termina con sys.exit(1). Con '30s' no es un entero -> Exited (1).
+$ WORKER_INTERVAL_SECONDS=30 python3 -c "import os; raw=os.environ['WORKER_INTERVAL_SECONDS']; print('intervalo cargado:', int(raw))"
+intervalo cargado: 30
 
-== Comandos a ejecutar con Docker (pendientes en este equipo) ==
-$ docker compose ps
-$ docker compose logs cierre-worker | tail -5
+Solución aplicada: .env.example -> WORKER_INTERVAL_SECONDS=30 (entero de segundos, sin sufijo 's').
 
-Resultado esperado: cierre-worker Exited (1) y en el log CIE-1107.
-
-Solución aplicada: .env.example -> WORKER_INTERVAL_SECONDS=30 (entero de segundos).

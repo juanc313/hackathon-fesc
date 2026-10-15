@@ -1,7 +1,15 @@
 INCIDENTE 2 — La API no conecta a la base
 ==========================================================
 
-== Diagnóstico ==
+== Registros en el log de la última noche (logs/worker.log) ==
+$ grep -n "CIE-2210" logs/worker.log | head -5
+33:[2026-09-30T20:35:22Z] [ERROR] codigo=CIE-2210 detalle="conexión rechazada para el usuario cierre_app" lote=209
+56:[2026-09-30T20:35:35Z] [ERROR] codigo=CIE-2210 detalle="conexión rechazada para el usuario cierre_app" lote=215
+68:[2026-09-30T20:35:42Z] [ERROR] codigo=CIE-2210 detalle="conexión rechazada para el usuario cierre_app" lote=359
+128:[2026-09-30T20:36:11Z] [ERROR] codigo=CIE-2210 detalle="conexión rechazada para el usuario cierre_app" lote=56
+136:[2026-09-30T20:36:15Z] [ERROR] codigo=CIE-2210 detalle="conexión rechazada para el usuario cierre_app" lote=40
+
+== Diagnóstico en la configuración original del kit ==
 $ unzip -p ../fesc-tecnico.zip fesc-tecnico/.env.example | grep -n DATABASE_HOST
 7:DATABASE_HOST=cierre-database
 
@@ -10,12 +18,23 @@ $ grep -nE '^  cierre-db:|^  cierre-api:|^  cierre-worker:' docker-compose.yml
 20:  cierre-api:
 29:  cierre-worker:
 
-El .env apuntaba a 'cierre-database', pero el servicio de la base se llama
-'cierre-db'. Dentro de la red de Compose los contenedores se resuelven por
-nombre de servicio, así que la API respondía 503 (CIE-2210).
+$ sed -n '28,36p' services/api/app.py
+def connect():
+    return psycopg2.connect(
+        host=os.environ.get("DATABASE_HOST", "localhost"),
+        port=int(os.environ.get("DATABASE_PORT", "5432")),
+        dbname=os.environ.get("DATABASE_NAME", "cierre"),
+        user=os.environ.get("DATABASE_USER", "cierre"),
+        password=os.environ.get("DATABASE_PASSWORD", ""),
+        connect_timeout=3,
+    )
 
-== Comandos a ejecutar con Docker ==
-$ docker compose ps
-$ docker compose logs cierre-api | tail -5
+== Verificación de la corrección en .env.example ==
+$ grep -n '^DATABASE_HOST=' .env.example
+16:DATABASE_HOST=cierre-db
 
-Solución aplicada: .env.example -> DATABASE_HOST=cierre-db
+El .env.example original apuntaba a 'cierre-database', pero el servicio de PostgreSQL
+en docker-compose.yml se llama 'cierre-db'. Dentro de la red de Compose los contenedores
+se resuelven por nombre de servicio; con DATABASE_HOST=cierre-db la API y el worker
+apuntan al servicio correcto.
+

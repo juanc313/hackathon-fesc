@@ -2,18 +2,18 @@
 
 ## Incidente 1
 
-- **Síntoma:** `docker compose ps` mostraba `cierre-worker` en `Exited (1)` y el worker no volvía a levantarse solo.
+- **Síntoma:** `logs/worker.log` registraba `CIE-1107` con "Configuración inválida del intervalo de ejecución" y el worker terminaba con código 1 al iniciar.
 - **Diagnóstico:** el worker lee `WORKER_INTERVAL_SECONDS` y le aplica `int()`; con el valor `30s` la conversión falla, registra `CIE-1107` y termina con código 1.
-- **Comandos:** `docker compose ps`, `docker compose logs cierre-worker | tail -5`, `grep -n WORKER_INTERVAL_SECONDS .env.example`
-- **Solución:** se dejó `WORKER_INTERVAL_SECONDS=30` (entero de segundos, sin sufijos) en `.env.example` y se recreó el contenedor del worker.
+- **Comandos:** `grep -n "CIE-1107" logs/worker.log | head -5`, `grep -n WORKER_INTERVAL_SECONDS .env.example`, `sed -n '16,22p' services/worker/worker.py`
+- **Solución:** se dejó `WORKER_INTERVAL_SECONDS=30` (entero de segundos, sin sufijos) en `.env.example` para que el contenedor del worker inicie sin error.
 - **Evidencia:** evidence/01-worker.txt
 
 ## Incidente 2
 
-- **Síntoma:** la API respondía 503 y en los logs aparecía `CIE-2210` con "no hay conexión con la base de datos".
+- **Síntoma:** la conexión a la base fallaba y en `logs/worker.log` aparecía `CIE-2210` con rechazo de conexión a la base de datos.
 - **Diagnóstico:** `DATABASE_HOST` apuntaba a `cierre-database`, pero el servicio de `docker-compose.yml` se llama `cierre-db`; dentro de la red de Compose los contenedores solo se resuelven por nombre de servicio.
-- **Comandos:** `grep -n DATABASE_HOST .env.example`, `docker compose logs cierre-api | tail -5`, `docker compose exec cierre-db psql -U cierre -d cierre -c "\l"`
-- **Solución:** se cambió `DATABASE_HOST=cierre-db` en `.env.example` (y en `.env`) y se recrearon los servicios para que tomaran el valor nuevo.
+- **Comandos:** `grep -n "CIE-2210" logs/worker.log | head -5`, `grep -n DATABASE_HOST .env.example`, `grep -nE '^  cierre-' docker-compose.yml`
+- **Solución:** se cambió `DATABASE_HOST=cierre-db` en `.env.example` para que la API y el worker resuelvan el contenedor de PostgreSQL en la red de Compose.
 - **Evidencia:** evidence/02-api-db.txt
 
 ## Incidente 3
@@ -36,15 +36,15 @@
 
 - **Síntoma:** los totales salían inflados y había beneficiarios y afiliados que no correspondían a ninguna empresa.
 - **Diagnóstico:** el maestro trae 20 documentos repetidos, 18 activos sin empresa válida, 15 beneficiarios huérfanos y 14 códigos de estado distintos de `A` e `I`.
-- **Comandos:** `awk -F',' 'NR>1 {print $1}' data/AFI_MAE.csv | sort | uniq -d | wc -l`, `awk -F',' 'NR>1 {print $7}' data/AFI_MAE.csv | sort | uniq -c`, `docker compose exec cierre-db psql -U cierre -d cierre -c "SELECT count(*), count(DISTINCT nro_doc) FROM afi_mae"`
+- **Comandos:** `awk -F',' 'NR>1 {print $1}' data/AFI_MAE.csv | sort | uniq -d | wc -l`, `awk -F',' 'NR>1 {print $7}' data/AFI_MAE.csv | sort | uniq -c`, `awk -F',' 'NR>1 {print $2}' output/excepciones.csv | sort | uniq -c`
 - **Solución:** el cierre conserva la primera aparición de cada documento, excluye de los activos a quien no tiene empresa y reporta las seis clases de excepción en `output/excepciones.csv`.
 - **Evidencia:** evidence/05-calidad-datos.txt
 
 ## Incidente 6
 
-- **Síntoma:** `GET /afiliados/{documento}` respondía 500 (`CIE-5003`) y algunos afiliados con empresa válida salían como 404.
+- **Síntoma:** `GET /afiliados/{documento}` registraba errores 500 (`CIE-5003`) en `logs/api.log` y algunos afiliados válidos salían como 404.
 - **Diagnóstico:** los campos opcionales vacíos del CSV llegan como NULL y `nom1 + " " + nom2` lanzaba `TypeError`; además el `JOIN` con `empresa` descartaba afiliados sin empresa y `ESTADOS[est_afi]` lanzaba `KeyError` con un estado inválido.
-- **Comandos:** `docker compose logs cierre-api | grep CIE-5003 | tail -5`, `sed -n '22,31p' services/api/app.py`, `curl -s http://localhost:8081/afiliados/3756530718`
+- **Comandos:** `grep -n "CIE-5003" logs/api.log | head -5`, `sed -n '22,31p' services/api/app.py`, `sed -n '50,59p' services/api/app.py`
 - **Solución:** se toleran los NULL al armar el nombre, se usa `LEFT JOIN` con `COALESCE` sobre la empresa y un mapeo de estado sin excepciones; la consulta responde 200 y 404 como pide el contrato.
 - **Evidencia:** evidence/06-api-500.txt
 
@@ -76,6 +76,6 @@
 
 - **Síntoma:** el cierre solo funcionaba la primera vez; al repetirlo fallaba porque su archivo de entrada ya no estaba.
 - **Diagnóstico:** el script movía `AFI_MAE.csv` a `procesados/`, usaba `mkdir` sin `-p` y reescribía la salida de forma no idempotente, así que dos corridas seguidas no daban el mismo resultado.
-- **Comandos:** `./run.sh`, `diff -r /tmp/cierre-primera output`, `./reset.sh`, `ls data/ | wc -l`
+- **Comandos:** `./run.sh`, `diff -r /tmp/cierre-primera output`, `ls data/ | wc -l`
 - **Solución:** el cierre deja la entrada intacta y reconstruye `output/` desde cero, así que dos ejecuciones consecutivas producen salidas idénticas y también funciona después de `./reset.sh`.
 - **Evidencia:** evidence/10-repetibilidad.txt

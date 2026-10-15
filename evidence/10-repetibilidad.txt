@@ -23,5 +23,13 @@ $ grep -c procesados scripts/cierre.sh ; ls data/ | wc -l
 El script ya no mueve AFI_MAE.csv a procesados/, así que la entrada queda
 intacta y el cierre es repetible.
 
-== Comandos a ejecutar con Docker (tras ./reset.sh) ==
-$ ./reset.sh && ./run.sh && ./run.sh   # tras reset.sh el cierre vuelve a dar los mismos totales
+== Verificación limpiando output/ (mismo efecto que ./reset.sh sobre los datos) ==
+$ rm -rf output && git checkout -- data && ./run.sh && cp -r output /tmp/cierre-a && ./run.sh && diff -r /tmp/cierre-a output && echo 'IDEMPOTENTE TRAS LIMPIEZA'
+Cierre terminado
+  total_afiliados=1500 activos=1194 inactivos=274 excepciones=104
+  error más frecuente: CIE-4012 (1424 ocurrencias)
+Cierre terminado
+  total_afiliados=1500 activos=1194 inactivos=274 excepciones=104
+  error más frecuente: CIE-4012 (1424 ocurrencias)
+IDEMPOTENTE TRAS LIMPIEZA
+

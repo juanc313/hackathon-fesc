@@ -24,6 +24,7 @@ $ awk -F, 'NR>1 {print $2}' output/excepciones.csv | sort | uniq -c
      12 FECHA_INVALIDA
      18 SIN_EMPRESA
 
-== Comandos a ejecutar con Docker (verificación en la base) ==
-$ docker compose exec cierre-db psql -U cierre -d cierre -c \
-    "SELECT count(*), count(DISTINCT nro_doc) FROM afi_mae"
+== Conteo de registros totales vs documentos únicos en el maestro ==
+$ awk -F, 'NR>1 {total++; docs[$1]=1} END {print "total="total, "distintos="length(docs)}' data/AFI_MAE.csv
+total=1520 distintos=1500
+

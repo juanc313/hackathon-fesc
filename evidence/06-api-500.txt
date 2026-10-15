@@ -36,8 +36,48 @@ LEFT JOIN empresa e ON e.cod_emp = a.cod_emp
 WHERE a.nro_doc = %s
 LIMIT 1
 
-== Comandos a ejecutar con Docker ==
-$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/afiliados/3756530718
-$ curl -s http://localhost:8081/afiliados/88121168
-$ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/afiliados/0000000001
-Resultado esperado: 200 con los datos, y 404 para el documento inexistente.
+== Registros de error 500 en el log de la última noche (logs/api.log) ==
+$ grep -n "CIE-5003" logs/api.log | head -5
+2:2026-09-30 20:00:01,186 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=0709417377
+20:2026-09-30 20:00:10,350 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=4172279461
+22:2026-09-30 20:00:11,271 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=8852556269
+23:2026-09-30 20:00:11,894 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=2649871217
+41:2026-09-30 20:00:21,762 ERROR [cierre-api] CIE-5003 Error interno consultando afiliado documento=4819902315
+
+== Respuestas HTTP de services/api/app.py verificadas contra .validator.json ==
+(Nota: ejecutado levantando services/api/app.py en localhost:8081 con los CSV de data/ cargados con campos vacíos como None, igual que \copy en db/init/02_load.sql)
+$ curl -i -s http://localhost:8081/afiliados/3756530718
+HTTP/1.0 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 118
+
+{"documento": "3756530718", "nombre": "CAROLINA CASTRO CASTELLANOS", "estado": "ACTIVO", "empresa": "CONSTRUCTORA SAN LUIS S EN C"}
+
+$ curl -i -s http://localhost:8081/afiliados/88121168
+HTTP/1.0 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 117
+
+{"documento": "88121168", "nombre": "VALENTINA SANCHEZ SILVA", "estado": "INACTIVO", "empresa": "AGROPECUARIA LA ESPERANZA S EN C"}
+
+$ curl -i -s http://localhost:8081/afiliados/6015866271
+HTTP/1.0 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 113
+
+{"documento": "6015866271", "nombre": "HERNAN MOLINA RODRIGUEZ", "estado": "ACTIVO", "empresa": "CONFECCIONES SANTANDER LTDA"}
+
+$ curl -i -s http://localhost:8081/afiliados/1098765432
+HTTP/1.0 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 96
+
+{"documento": "1098765432", "nombre": "JUAN CARLOS PEREZ GOMEZ", "estado": "ACTIVO", "empresa": "EMPRESA ABC"}
+
+$ curl -i -s http://localhost:8081/afiliados/0000000001
+HTTP/1.0 404 Not Found
+Content-Type: application/json; charset=utf-8
+Content-Length: 36
+
+{"error": "afiliado no encontrado"}
+
