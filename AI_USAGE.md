@@ -39,3 +39,11 @@
 - Prompt principal (resumido): "creo que ya está hecho por Freebuff, míralo y dime qué falta o qué corregirías"
 - Qué produjo: por iniciativa propia revisó el kit, ejecutó `run.sh` dos veces para comprobar totales y `top_error`, y señaló que Docker no se había probado en este equipo, que en `evidence/` había textos de pendiente y que `incident-report.md` listaba `docker` y `psql` sin haberlos corrido.
 - Qué modificó o corrigió el equipo: revisé las observaciones, pedí quitar de `incident-report.md` y de `evidence/` cualquier comando de Docker no ejecutado, anoté en el `README.md` que Docker no se probó localmente y revisé `git diff` y `git status` antes de hacer mis propios commits.
+
+## Uso 6
+
+- Herramienta: GitHub Copilot (agente en la nube, modelo en modo automático)
+- Para qué se usó: auditar con un tercer modelo, independiente de Freebuff y de Claude, el conteo de excepciones del cierre, que es el único valor del control oficial que el validador público no puede comprobar: `output/totales.txt` publica `total_afiliados`, `activos` e `inactivos`, pero la clave `excepciones` se contrasta contra el control oculto del calificador.
+- Prompt principal (resumido): "clona el repositorio público y cuenta desde `data/`, sin mirar `output/`, los siete números del cierre —filas y documentos distintos, documentos repetidos, activos sin empresa, códigos inválidos, fechas inválidas, beneficiarios huérfanos y casos del cruce con Caja Oriente—, cada uno con el comando usado".
+- Qué produjo: clonó el repositorio público y, con PowerShell (`Import-Csv`, `Group-Object`, `DateTime.ParseExact`), devolvió 1.520 filas y 1.500 documentos distintos, 20 documentos repetidos, 18 activos sin empresa, 14 códigos inválidos, 12 fechas inválidas, 15 beneficiarios huérfanos y 25 casos de cruce.
+- Qué modificó o corrigió el equipo: sumé sus siete conteos y dan 104, exactamente lo que ya reportaba el cierre, así que comprobé tipo por tipo contra `output/excepciones.csv` y contra los hashes de `.validator.json` y no toqué `scripts/cierre.sh`: la corrección fue de verificación, no de código. Dejo anotado que ese total sigue siendo el único número cuya definición depende del control oculto del calificador.
