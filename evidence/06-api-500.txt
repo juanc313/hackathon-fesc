@@ -52,7 +52,11 @@ carga la base (db/init/02_load.sql toma los CSV de data/ con \copy, que carga lo
 campos vacíos como NULL) y el resultado se contrasta con las huellas de
 .validator.json, que es lo que evalúa la prueba T06 del validador.
 
-$ python3 - <<'PY'
+# Igual que en la evidencia del incidente 1: en este equipo 'python3' es el alias
+# inservible de la Microsoft Store y el intérprete real es 'py -3' (Python 3.14.8).
+# Este bloque se extrajo del propio archivo y se volvió a ejecutar tal cual, con
+# esas líneas de salida.
+$ py -3 - <<'PY'
 import csv, hashlib, json
 pub = json.load(open(".validator.json", encoding="utf-8"))
 def fp(v): return hashlib.pbkdf2_hmac("sha256", v.encode(), pub["salt"].encode(), 200000).hex()

@@ -23,14 +23,29 @@ def load_interval():
         sys.exit(1)
 
 == Reproducción del fallo y verificación de la corrección ==
-$ WORKER_INTERVAL_SECONDS=30s python3 -c "import sys; sys.path.insert(0,'services/worker'); import psycopg2_stub as psycopg2; sys.modules['psycopg2']=psycopg2; import worker; worker.load_interval()"
-[2026-10-14T23:35:10Z] [ERROR] codigo=CIE-1107 WORKER_INTERVAL_SECONDS debe ser un entero de segundos; valor recibido: '30s'
+# En el servidor Linux del evento el intérprete se llama 'python3'; en este equipo
+# de Windows 'python3' es el alias inservible de la Microsoft Store (no ejecuta
+# nada), así que los comandos de esta sección se corrieron con 'py -3' (Python
+# 3.14.8). No hace falta ningún archivo auxiliar: el sustituto del driver va en
+# línea, porque lo único que worker.py necesita de psycopg2 para llegar a
+# load_interval() es el nombre del módulo y el de OperationalError.
+
+$ WORKER_INTERVAL_SECONDS=30s py -3 - <<'PY'
+import sys, types
+sys.path.insert(0, "services/worker")
+psycopg2 = types.ModuleType("psycopg2")
+psycopg2.OperationalError = type("OperationalError", (Exception,), {})
+sys.modules["psycopg2"] = psycopg2
+import worker
+worker.load_interval()
+PY
+[2026-10-15T18:33:52Z] [ERROR] codigo=CIE-1107 WORKER_INTERVAL_SECONDS debe ser un entero de segundos; valor recibido: '30s'
 (exit code 1)
 
 $ grep -n WORKER_INTERVAL_SECONDS .env.example
 23:WORKER_INTERVAL_SECONDS=30
 
-$ WORKER_INTERVAL_SECONDS=30 python3 -c "import os; raw=os.environ['WORKER_INTERVAL_SECONDS']; print('intervalo cargado:', int(raw))"
+$ WORKER_INTERVAL_SECONDS=30 py -3 -c "import os; print('intervalo cargado:', int(os.environ['WORKER_INTERVAL_SECONDS']))"
 intervalo cargado: 30
 
 Solución aplicada: .env.example -> WORKER_INTERVAL_SECONDS=30 (entero de segundos, sin sufijo 's').
